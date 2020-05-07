@@ -4,7 +4,7 @@ import torch
 import torch.nn.functional as F
 import torchvision.models as models
 
-from utils import *
+from score_cam_utils import *
 from cam.scorecam import *
 
 # alexnet

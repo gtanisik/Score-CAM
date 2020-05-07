@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 
 import torchvision.transforms as transforms
 import torchvision.transforms.functional as F
+import torchvision.models as models
 
 from .imagenet import *
 
@@ -365,11 +366,27 @@ def find_resnet_layer(arch, target_layer_name):
 
         if len(hierarchy) == 4:
             target_layer = target_layer._modules[hierarchy[3]]
+        return target_layer
 
     else:
-        target_layer = arch._modules[target_layer_name]
+        target_layers = list()
+        for layer_name in target_layer_name:
+            input_name, hierarchy = layer_name.split('#')
+            hierarchy = hierarchy.split('_')
+            target_layer = getattr(getattr(arch, input_name).resnet, hierarchy[0])
 
-    return target_layer
+            if len(hierarchy) >= 2:
+                bottleneck_num = int(hierarchy[1].lower().lstrip('bottleneck').lstrip('basicblock'))
+                target_layer = target_layer[bottleneck_num]
+
+            if len(hierarchy) >= 3:
+                target_layer = target_layer._modules[hierarchy[2]]
+
+            if len(hierarchy) == 4:
+                target_layer = target_layer._modules[hierarchy[3]]
+            target_layers.append(target_layer)
+        #target_layer = arch._modules[target_layer_name]
+        return target_layers
 
 
 def find_densenet_layer(arch, target_layer_name):
@@ -450,16 +467,24 @@ def find_alexnet_layer(arch, target_layer_name):
     Return:
         target_layer: found layer. this layer will be hooked to get forward/backward pass information.
     """
-    if target_layer_name is None:
-        target_layer_name = 'features_29'
 
-    hierarchy = target_layer_name.split('_')
+    if isinstance(arch, models.AlexNet):
+        if target_layer_name is None:
+            target_layer_name = 'features_29'
 
-    if len(hierarchy) >= 1:
-        target_layer = arch.features
+        hierarchy = target_layer_name.split('_')
 
-    if len(hierarchy) == 2:
-        target_layer = target_layer[int(hierarchy[1])]
+        if len(hierarchy) >= 1:
+            target_layer = arch.features
+
+        if len(hierarchy) == 2:
+            target_layer = target_layer[int(hierarchy[1])]
+    else: # gtanisik - multistream alexnet version
+        target_layer = list()
+        for layer_name in target_layer_name:
+            input_name, hierarchy = layer_name.split('#')
+            hierarchy = hierarchy.split('_')
+            target_layer.append(getattr(arch, input_name).alexnet.features[int(hierarchy[1])])
 
     return target_layer
 
